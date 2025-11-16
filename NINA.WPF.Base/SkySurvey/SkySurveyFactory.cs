@@ -26,6 +26,10 @@ namespace NINA.WPF.Base.SkySurvey {
 
         public ISkySurvey Create(SkySurveySource source) {
             switch (source) {
+
+                case SkySurveySource.ASTROBIN:
+                    return new AstroBinSkySurvey();
+
                 case SkySurveySource.NASA:
                     return new NASASkySurvey();
 
@@ -62,6 +66,10 @@ namespace NINA.WPF.Base.SkySurvey {
 
         public static string GetCacheSourceString(this SkySurveySource source) {
             switch (source) {
+
+                case SkySurveySource.ASTROBIN:
+                    return typeof(AstroBinSkySurvey).Name;
+
                 case SkySurveySource.NASA:
                     return typeof(NASASkySurvey).Name;
 

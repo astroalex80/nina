@@ -19,6 +19,9 @@ namespace NINA.Core.Enum {
 
     [TypeConverter(typeof(EnumDescriptionTypeConverter))]
     public enum SkySurveySource {
+        
+        [Description("LblAstrobinSkySurvey")]
+        ASTROBIN,
 
         [Description("LblNASASkySurvey")]
         NASA,

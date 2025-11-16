@@ -1,0 +1,181 @@
+﻿<UserControl
+    x:Class="NINA.View.FramingAstrobinPickerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:NINA.View"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary"
+    xmlns:ns="clr-namespace:NINA.Core.Locale;assembly=NINA.Core"
+    xmlns:rules="clr-namespace:NINA.Core.Utility.ValidationRules;assembly=NINA.Core"
+    xmlns:util="clr-namespace:NINA.Core.Utility;assembly=NINA.Core"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Margin="0,0,0,8"
+            FontSize="18"
+            FontWeight="Bold"
+            Text="AstroBin – Image Selection" />
+
+        <DataGrid
+            Grid.Row="1"
+            AutoGenerateColumns="False"
+            Background="{StaticResource BackgroundBrush}"
+            CanUserAddRows="False"
+            IsReadOnly="True"
+            ItemsSource="{Binding AstrobinCandidates}"
+            SelectedItem="{Binding SelectedAstrobinCandidate, Mode=TwoWay}">
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="{x:Type DataGridColumnHeader}">
+                    <Setter Property="FontSize" Value="15" />
+                    <Setter Property="Background" Value="{StaticResource SecondaryBackgroundBrush}" />
+                    <Setter Property="FontWeight" Value="bold" />
+                    <Setter Property="Height" Value="25" />
+                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+
+            <DataGrid.RowStyle>
+                <Style TargetType="{x:Type DataGridRow}">
+                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                    <Setter Property="Background" Value="{StaticResource BackgroundBrush}" />
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Width="50" Header="Index">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <Hyperlink Command="{Binding DataContext.PickAstrobinCandidateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                    <Run Text="{Binding Index}" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Width="150" Header="Thumbnail">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Margin="2" ToolTip="Click here to open the image in Framing Wizard">
+                                <Hyperlink Command="{Binding DataContext.PickAstrobinCandidateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                    <InlineUIContainer>
+                                        <Image
+                                            Width="96"
+                                            Source="{Binding Thumbnail}"
+                                            Stretch="Uniform" />
+                                    </InlineUIContainer>
+                                </Hyperlink>
+                            </TextBlock>
+
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn
+                    Width="80"
+                    Binding="{Binding Likes}"
+                    Header="Likes" />
+                <DataGridTextColumn
+                    Width="120"
+                    Binding="{Binding PixScale, StringFormat=F2}"
+                    Header="PixScale (″/px)" />
+                <DataGridTextColumn Width="120" Header="FoV">
+                    <DataGridTextColumn.Binding>
+                        <MultiBinding StringFormat="{}{0:F2}° x {1:F2}°">
+                            <Binding Path="FovWidthDeg" />
+                            <Binding Path="FovHeightDeg" />
+                        </MultiBinding>
+                    </DataGridTextColumn.Binding>
+                </DataGridTextColumn>
+                <DataGridTextColumn Width="120" Header="Size (px)">
+                    <DataGridTextColumn.Binding>
+                        <MultiBinding StringFormat="{}{0:F0} x {1:F0}">
+                            <Binding Path="Width" />
+                            <Binding Path="Height" />
+                        </MultiBinding>
+                    </DataGridTextColumn.Binding>
+                </DataGridTextColumn>
+                <DataGridTextColumn
+                    Width="70"
+                    Binding="{Binding Rotation, StringFormat={}{0:F2}°}"
+                    Header="Rotation" />
+                <!--
+                <DataGridTextColumn
+                    Width="100"
+                    Binding="{Binding FovHeightDeg, StringFormat=F2}"
+                    Header="FoV Height (°)" />
+                <DataGridTextColumn
+                    Width="*"
+                    Binding="{Binding Width}"
+                    Header="Width" />
+                <DataGridTextColumn
+                    Width="*"
+                    Binding="{Binding Height}"
+                    Header="Height" />
+                -->
+                <DataGridTemplateColumn Width="150" Header="User">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <Hyperlink Command="{Binding DataContext.OpenAstrobinOnWebCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding UserUrl}">
+                                    <Run Text="{Binding User}" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Width="150" Header="AstroBin">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <Hyperlink Command="{Binding DataContext.OpenAstrobinOnWebCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding ImageUrl}">
+                                    <Run Text="Open on Astrobin" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel
+            Grid.Row="2"
+            Margin="0,8,0,0"
+            HorizontalAlignment="Right"
+            Orientation="Horizontal">
+            <Button
+                Margin="0,0,8,0"
+                Command="{Binding CloseDialogCommand}"
+                CommandParameter="False"
+                Content="Cancel" />
+            <Button
+                Command="{Binding CloseDialogCommand}"
+                CommandParameter="True"
+                Content="OK">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <!--  Standard: enabled  -->
+                        <Setter Property="IsEnabled" Value="True" />
+                        <!--  Wenn keine Auswahl: disable  -->
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedAstrobinCandidate}" Value="{x:Null}">
+                                <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

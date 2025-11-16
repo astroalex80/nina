@@ -2038,6 +2038,9 @@ Calculated HFR: {2}
   <data name="LblName" xml:space="preserve">
     <value>Name</value>
   </data>
+  <data name="LblAstrobinSkySurvey" xml:space="preserve">
+    <value>Astrobin Sky Survey</value>
+  </data>
   <data name="LblNASASkySurvey" xml:space="preserve">
     <value>NASA Sky Survey</value>
   </data>

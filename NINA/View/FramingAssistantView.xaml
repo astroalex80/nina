@@ -85,6 +85,52 @@
                             </Border>
 
                             <Grid>
+                                <!--  Astrobin Specific UI  -->
+                                <Grid.Style>
+                                    <Style TargetType="{x:Type Grid}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ElementName=PART_FramingAssistantSource, Path=SelectedItem}" Value="{x:Static enum:SkySurveySource.ASTROBIN}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <StackPanel Orientation="Vertical">
+                                    <WrapPanel Orientation="Horizontal">
+                                        <TextBlock Text="This sky survey makes use of " TextWrapping="Wrap" />
+                                        <TextBlock TextWrapping="Wrap">
+                                            <Hyperlink NavigateUri="https://www.astrobin.com/" RequestNavigate="Hyperlink_RequestNavigate">Astrobin</Hyperlink>
+                                        </TextBlock>
+                                        <TextBlock Text=" the leading platform for astrophotographers" TextWrapping="Wrap" />
+                                    </WrapPanel>
+                                    <TextBlock>
+                                        <Hyperlink NavigateUri="{Binding DataContext.AstrobinUrl, RelativeSource={RelativeSource AncestorType={x:Type local:FramingAssistantView}}}" RequestNavigate="Hyperlink_RequestNavigate">
+                                            <TextBlock Text="{Binding DataContext.AstrobinUrl, RelativeSource={RelativeSource AncestorType={x:Type local:FramingAssistantView}}}" />
+                                        </Hyperlink>
+                                    </TextBlock>
+
+                                    <Grid Margin="0,5,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="{ns:Loc LblSaveInCache}" />
+                                        <CheckBox
+                                            Grid.Column="1"
+                                            Margin="5,0,0,0"
+                                            HorizontalAlignment="Left"
+                                            IsChecked="{Binding SaveImageInOfflineCache}">
+                                            <CheckBox.ToolTip>
+                                                <TextBlock Text="{ns:Loc LblSaveInCacheTooltip}" />
+                                            </CheckBox.ToolTip>
+                                        </CheckBox>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+
+
+                            <Grid>
                                 <!--  NASA Specific UI  -->
                                 <Grid.Style>
                                     <Style TargetType="{x:Type Grid}">
@@ -123,6 +169,8 @@
                                     </Grid>
                                 </StackPanel>
                             </Grid>
+
+
 
                             <Grid>
                                 <!--  SkyServer Specific UI  -->

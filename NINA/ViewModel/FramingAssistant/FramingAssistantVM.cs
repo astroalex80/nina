@@ -26,12 +26,14 @@ using NINA.Equipment.Equipment.MyCamera;
 using NINA.Equipment.Exceptions;
 using NINA.Equipment.Interfaces;
 using NINA.Equipment.Interfaces.Mediator;
+using NINA.Image.ImageData;
 using NINA.Image.Interfaces;
 using NINA.PlateSolving;
 using NINA.Profile.Interfaces;
 using NINA.Sequencer.Container;
 using NINA.Sequencer.Interfaces.Mediator;
 using NINA.Sequencer.SequenceItem.Platesolving;
+using NINA.View;
 using NINA.WPF.Base.Behaviors;
 using NINA.WPF.Base.Exceptions;
 using NINA.WPF.Base.Interfaces.Mediator;
@@ -315,6 +317,42 @@ namespace NINA.ViewModel.FramingAssistant {
                     resizeTimer.Start();
                 }
             });
+
+            OpenAstrobinOnWebCommand = new RelayCommand(o => {
+                if (o is string url && !string.IsNullOrWhiteSpace(url)) {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+                }
+            });
+
+            //PickAstrobinCandidateCommand = new AsyncCommand<object>(async o => {
+            //    var cand = o as AstrobinCandidateVM;
+            //    if (cand == null) return (object)null;
+
+            //    SelectedAstrobinCandidate = cand;
+
+            //    return (object)null;
+            //});
+
+            PickAstrobinCandidateCommand = new AsyncCommand<object>(async o => {
+                if (o is AstrobinCandidateVM cand) {
+                    try {
+                        SelectedAstrobinCandidate = cand;
+                        await LoadAstrobinSelection(cand.Source); // <-- Bild direkt laden
+                    } catch {
+                        SelectedAstrobinCandidate = null;
+                    }
+                    //finally {
+                    //    SelectedAstrobinCandidate = null;
+                    //    //try { windowServiceFactory.Close(true); } catch { /* falls Close nicht verfügbar */ }
+                    //}
+                }
+                return (object)null;
+            });
+
+            //CloseDialogCommand = new RelayCommand(p => {
+            //    try { windowServiceFactory.Close(p is bool b && b); } catch { }
+            //});
+
         }
 
         private async Task<bool> GetRotationFromCamera(object arg) {
@@ -1085,7 +1123,8 @@ namespace NINA.ViewModel.FramingAssistant {
                 _loadImageSource?.Dispose();
                 _loadImageSource = new CancellationTokenSource();
                 try {
-                    Logger.Info($"Loading image from source {FramingAssistantSource} with field of view {FieldOfView}° for coordinates {DSO?.Coordinates}");
+                    Logger.Info(
+                        $"Loading image from source {FramingAssistantSource} with field of view {FieldOfView}° for coordinates {DSO?.Coordinates}");
 
                     if (DllLoader.IsX86()) {
                         await _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => {
@@ -1104,13 +1143,76 @@ namespace NINA.ViewModel.FramingAssistant {
 
                     if (Cache != null && DSO != null) {
                         try {
-                            skySurveyImage = await Cache.GetImage(FramingAssistantSource.GetCacheSourceString(), DSO.Coordinates.RA, DSO.Coordinates.Dec, 360 - DSO.RotationPositionAngle, AstroUtil.DegreeToArcmin(FieldOfView));
+                            skySurveyImage = await Cache.GetImage(FramingAssistantSource.GetCacheSourceString(),
+                                DSO.Coordinates.RA, DSO.Coordinates.Dec, 360 - DSO.RotationPositionAngle,
+                                AstroUtil.DegreeToArcmin(FieldOfView));
                         } catch (Exception ex) {
                             Logger.Error(ex);
                         }
                     }
 
                     if (skySurveyImage == null) {
+                        if (FramingAssistantSource == SkySurveySource.ASTROBIN) {
+
+                            var resolution = 206.265 * (CameraPixelSize / FocalLength); // arcsec/pixel
+                            
+                            var fovDeg = AstroUtil.MaxFieldOfView(resolution, CameraWidth, CameraHeight);
+
+                            var astrobinSurvey = new AstroBinSkySurvey();
+                            var metadataList = await astrobinSurvey.GetMetadata(
+                                DSO?.Name ?? string.Empty,
+                                DSO?.Coordinates,
+                                fovDeg,
+                                CameraWidth,
+                                CameraHeight,
+                                _loadImageSource.Token,
+                                _progress);
+                            
+                            AstrobinCandidates = new AsyncObservableCollection<AstrobinCandidateVM>(
+                                metadataList.Select((m, i) => new AstrobinCandidateVM {
+                                    Index = i + 1,
+                                    Thumbnail = m.Thumbnail,
+                                    PixScale = m.PixScale,
+                                    Likes = m.Likes,
+                                    FovDeg = m.Radius * 2.0, // Radius * 2
+                                    Width = m.Width,
+                                    Height = m.Height,
+                                    FovWidthDeg = AstroUtil.ArcsecToDegree(m.Width * m.PixScale),
+                                    FovHeightDeg = AstroUtil.ArcsecToDegree(m.Height * m.PixScale),
+                                    UrlReal = m.UrlReal,
+                                    User = m.User,
+                                    UserUrl = m.UserUrl,
+                                    ImageUrl = m.ImageUrl,
+                                    Rotation = m.Rotation,
+                                    Source = m
+                                }));
+
+                            if (!AstrobinCandidates.Any()) {
+                                Notification.ShowWarning("AstroBin: No suitable images found.");
+                                return false;
+                            }
+
+                            var pickerView = new FramingAstrobinPickerView { DataContext = this };
+                            var dlg = windowServiceFactory.Create();
+
+                            dlg.ShowDialog(pickerView, "Astrobin Selection");
+
+                            if (SelectedAstrobinCandidate != null) {
+                                await LoadAstrobinSelection(SelectedAstrobinCandidate.Source);
+                                SelectedAstrobinCandidate = null;
+                                return true;
+                            }
+
+                            return false;
+                        }
+
+
+
+                    }
+                
+
+
+                if (skySurveyImage == null) {
                         if (FramingAssistantSource == SkySurveySource.CACHE) {
                             if (Cache == null) {
                                 throw new Exception("Cache unavailable. Check log file for errors");
@@ -1181,6 +1283,114 @@ namespace NINA.ViewModel.FramingAssistant {
                 return true;
             }
         }
+        static BitmapSource RotateToZero(BitmapSource src, double angleDeg) {
+            // negative Gegenrotation anwenden (angleDeg = -selectedImg.Rotation)
+            double norm = ((angleDeg % 360) + 360) % 360; // 0..360
+
+            // Fast-Path für 90°-Vielfache
+            //int nearest90 = (int)Math.Round(norm / 90.0) * 90;
+            //if (Math.Abs(norm - nearest90) < 0.001) {
+            //    Rotation rot = Rotation.Rotate0;
+            //    switch ((nearest90 + 360) % 360) {
+            //        case 90: rot = Rotation.Rotate90; break;
+            //        case 180: rot = Rotation.Rotate180; break;
+            //        case 270: rot = Rotation.Rotate270; break;
+            //    }
+            //    var rb = new RotatedBitmap(src, rot);
+            //    rb.Freeze();
+            //    return rb;
+            //}
+
+            // Arbiträrer Winkel: RenderTargetBitmap
+            int w = src.PixelWidth, h = src.PixelHeight;
+            double rad = norm * Math.PI / 180.0;
+            double cos = Math.Abs(Math.Cos(rad));
+            double sin = Math.Abs(Math.Sin(rad));
+            int newW = (int)Math.Ceiling(w * cos + h * sin);
+            int newH = (int)Math.Ceiling(w * sin + h * cos);
+
+            var rtb = new RenderTargetBitmap(newW, newH, src.DpiX, src.DpiY, PixelFormats.Pbgra32);
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen()) {
+                // um das Zentrum drehen und dann zeichnen
+                dc.PushTransform(new TranslateTransform(newW / 2.0, newH / 2.0));
+                dc.PushTransform(new RotateTransform(norm));
+                dc.PushTransform(new TranslateTransform(-w / 2.0, -h / 2.0));
+                dc.DrawImage(src, new Rect(0, 0, w, h));
+            }
+            rtb.Render(dv);
+            rtb.Freeze();
+            return rtb;
+        }
+        private async Task LoadAstrobinSelection(AstroBinImageObject selectedImg) {
+            try {
+                // 1) Bild herunterladen (HD)
+                var request = new NINA.Core.Utility.Http.HttpDownloadImageRequest(selectedImg.UrlHd);
+                var bmp = await request.Request(_loadImageSource?.Token ?? CancellationToken.None, _progress);
+
+                if (bmp.DpiX != 96) {
+                    int w = bmp.PixelWidth, h = bmp.PixelHeight, stride = w * bmp.Format.BitsPerPixel;
+                    byte[] pixels = new byte[stride * h];
+                    bmp.CopyPixels(pixels, stride, 0);
+                    bmp = BitmapSource.Create(w, h, 96, 96, bmp.Format, null, pixels, stride);
+                }
+
+                //if (selectedImg.Rotation > 0.001) {
+                //    bmp = RotateToZero(bmp, -selectedImg.Rotation);
+                //}
+
+                var coords = new NINA.Astrometry.Coordinates(
+                    selectedImg.Ra, selectedImg.Dec, NINA.Astrometry.Epoch.J2000, NINA.Astrometry.Coordinates.RAType.Degrees);
+                
+                var skySurveyImage = new SkySurveyImage {
+                    Name = DeepSkyObjectSearchVM?.TargetName ?? DSO?.Name ?? string.Empty,
+                    Source = nameof(SkySurveySource.ASTROBIN),
+                    Image = bmp,
+                    FoVWidth = AstroUtil.ArcsecToArcmin(selectedImg.PixScale * selectedImg.Width),
+                    FoVHeight = AstroUtil.ArcsecToArcmin(selectedImg.PixScale * selectedImg.Height), 
+                    Rotation = selectedImg.Rotation,
+                    Coordinates = coords
+                };
+
+                skySurveyImage.Image.Freeze();
+
+                await _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => {
+                    ImageParameter = null;
+                    GC.Collect();
+                    ImageParameter = skySurveyImage;
+                }));
+
+                if (Cache != null && SaveImageInOfflineCache && FramingAssistantSource != SkySurveySource.SKYATLAS) {
+                    SelectedImageCacheInfo = Cache.SaveImageToCache(skySurveyImage);
+                    RaisePropertyChanged(nameof(ImageCacheInfo));
+                }
+
+                await SkyMapAnnotator.Initialize(
+                    skySurveyImage.Coordinates,
+                    AstroUtil.ArcminToDegree(skySurveyImage.FoVHeight),
+                    ImageParameter.Image.PixelWidth,
+                    ImageParameter.Image.PixelHeight,
+                    ImageParameter.Rotation,
+                    Cache,
+                    _loadImageSource?.Token ?? CancellationToken.None);
+
+                SkyMapAnnotator.DynamicFoV = FramingAssistantSource == SkySurveySource.SKYATLAS;
+                CalculateRectangle(SkyMapAnnotator.ViewportFoV);
+                if (FramingAssistantSource != SkySurveySource.FILE) {
+                    RectangleTotalRotation = profileService.ActiveProfile.FramingAssistantSettings.LastRotationAngle;
+                }
+
+            } catch (OperationCanceledException) {
+                // ignore
+            } catch (Exception ex) {
+                Logger.Error("Failed to load AstroBin selection", ex);
+                Notification.ShowError(ex.Message);
+            } 
+            //finally {
+            //    AstrobinCandidates?.Clear();
+            //}
+        }
+
 
         private async Task<FileSkySurveyImage> PlateSolveSkySurvey(FileSkySurveyImage skySurveyImage) {
             var referenceCoordinates = skySurveyImage.Coordinates != null ? skySurveyImage.Coordinates : DSO.Coordinates ?? new Coordinates(Angle.Zero, Angle.Zero, Epoch.J2000);
@@ -1554,6 +1764,37 @@ namespace NINA.ViewModel.FramingAssistant {
             this.cameraMediator.RemoveConsumer(this);
         }
 
+        // DTO für die Anzeige im Grid
+        public class AstrobinCandidateVM {
+
+            public BitmapSource Thumbnail { get; set; }
+            public int Index { get; set; }
+            public double PixScale { get; set; }      // arcsec/px
+            public int Likes { get; set; }
+            public double FovDeg { get; set; }        // Radius * 2 (deg)
+            public int Width { get; set; }
+            public int Height { get; set; }
+            public double FovWidthDeg { get; set; }
+            public double FovHeightDeg { get; set; }
+            public string UrlReal { get; set; }       // Link zu AstroBin
+            public string ImageUrl { get; set; }
+            public string User { get; set; }
+            public string UserUrl { get; set; }
+            public double Rotation { get; set; }
+
+            public AstroBinImageObject Source { get; set; }
+        }
+
+        private AsyncObservableCollection<AstrobinCandidateVM> _astrobinCandidates;
+        public AsyncObservableCollection<AstrobinCandidateVM> AstrobinCandidates {
+            get => _astrobinCandidates ??= new AsyncObservableCollection<AstrobinCandidateVM>();
+            set { _astrobinCandidates = value; RaisePropertyChanged(); }
+        }
+        public AstrobinCandidateVM SelectedAstrobinCandidate { get; set; }
+
+        public IAsyncCommand PickAstrobinCandidateCommand { get; private set; }
+        public ICommand CloseDialogCommand { get; private set; }
+        public ICommand OpenAstrobinOnWebCommand { get; private set; }
         public ICommand CoordsFromPlanetariumCommand { get; set; }
         public ICommand CoordsFromScopeCommand { get; set; }
         public ICommand DragStartCommand { get; private set; }
